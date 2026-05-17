@@ -30,6 +30,8 @@ class MvaveBLEEditor {
         this.isDragging = false;
         this.lastDumpHex = ""; // Keeps track of the last received state
         this.beatIntervalId = null;
+        this.activePresetId = 0;
+        this.currentRawData = new Uint8Array(92);
 
         // Pre-populate offline state so the signal chain (and arrows) are visible immediately
         this.currentState = {
@@ -137,6 +139,20 @@ class MvaveBLEEditor {
             }
         });
         document.getElementById('savePresetBtn')?.addEventListener('click', () => this.saveCurrentPreset());
+
+        // Advanced Settings Panel Toggle
+        const advancedSettingsBtn = document.getElementById('advancedSettingsBtn');
+        const advancedSettingsPanel = document.getElementById('advancedSettingsPanel');
+        if (advancedSettingsBtn && advancedSettingsPanel) {
+            advancedSettingsBtn.addEventListener('click', () => {
+                advancedSettingsPanel.classList.toggle('visible');
+            });
+            document.addEventListener('click', (e) => {
+                if (advancedSettingsPanel.classList.contains('visible') && !advancedSettingsPanel.contains(e.target) && !advancedSettingsBtn.contains(e.target)) {
+                    advancedSettingsPanel.classList.remove('visible');
+                }
+            });
+        }
     }
 
     initDoubleClickEdit() {
@@ -402,6 +418,7 @@ class MvaveBLEEditor {
     handleDisconnect() {
         this.isConnected = false;
         this.syncState = 'IDLE';
+        this.setModified(false);
         this.updateUI();
         if (this.pollingInterval) clearInterval(this.pollingInterval);
         document.getElementById('loadingOverlay').style.display = 'none';
@@ -497,6 +514,7 @@ class MvaveBLEEditor {
         // --- PRESET SYNC STREAM (Catches 20 04 response) ---
         if (bytes.length === 19 && bytes[10] === 0x20 && bytes[11] === 0x04) {
             const activePresetId = bytes[14]; // The magic byte containing the preset number
+            this.activePresetId = activePresetId;
             
             const currentPatchNumEl = document.getElementById('patchNumber');
             const expectedText = `P${(activePresetId + 1).toString().padStart(2, '0')}`;
@@ -520,7 +538,7 @@ class MvaveBLEEditor {
                             patchNameEl.textContent = fullText.includes(': ') ? fullText.split(': ')[1] : `Preset ${activePresetId + 1}`;
                         }
                         
-                        this.isModified = false; // Removes "Modified" status since we switched presets
+                        this.setModified(false); // Removes "Modified" status since we switched presets
                         activeItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     }
                 }
@@ -550,6 +568,8 @@ class MvaveBLEEditor {
         // If the incoming state is identical to the current one, abort instantly!
         if (this.lastDumpHex === currentDumpHex) return; 
         this.lastDumpHex = currentDumpHex;
+
+        this.currentRawData = new Uint8Array(data);
 
         this.currentState = {
             volume: data[0],
@@ -595,7 +615,8 @@ class MvaveBLEEditor {
     async loadPreset(presetId) {
         if (!this.isConnected) return;
         this.log(`Loading Preset: P${(presetId + 1).toString().padStart(2, '0')}`, "sent");
-        this.registerEdit(); // Pauses UI to prevent flickering during preset switch
+        this.lastUiEditTime = Date.now(); // Pauses UI to prevent flickering during preset switch
+        this.setModified(false);
         
         const idHex = presetId.toString(16).padStart(2, '0');
         const cmdHex = `00 59 22 09 00 00 04 ${idHex} 00 00 E0 01 00 00 01 00`;
@@ -611,57 +632,110 @@ class MvaveBLEEditor {
         } catch (error) { this.log(`Load preset failed: ${error.message}`, "error"); }
     }
 
+    async savePresetToSlot(presetId, presetData) {
+        if (!this.isConnected || !presetData || presetData.length !== 92) return;
+        
+        const address = presetId * 92;
+        const addrL = address & 0xFF;
+        const addrH = (address >> 8) & 0xFF;
+
+        const header = new Uint8Array([
+            0x00, 0x59, 0x22, 0x64, 0x00, 0x00, 0x04, 
+            addrL, addrH, 0x00, 0x00, 0x5C, 0x00, 0x00
+        ]);
+
+        const payload = new Uint8Array(107);
+        payload.set(header, 0);
+        payload.set(presetData, 14);
+        payload[106] = this.calculateChecksum(payload);
+
+        this.log(`Saving preset to P${(presetId + 1).toString().padStart(2, '0')}...`, "sent");
+
+        try {
+            await this.writeCharacteristic.writeValueWithoutResponse(payload);
+            this.log(`Preset saved successfully to P${(presetId + 1).toString().padStart(2, '0')}!`, "success");
+            
+            this.setModified(false);
+        } catch (error) {
+            this.log(`Save preset failed: ${error.message}`, "error");
+            throw error;
+        }
+    }
+
     async saveCurrentPreset() {
-        if (!this.isConnected) return;
-        const commitHex = `00 59 22 08 00 00 04 00 00 00 F0 00 00 00 0B`;
-        this.log(`Committing UI to Pedal Screen...`, "sent");
+        if (!this.isConnected || this.activePresetId === undefined || !this.currentRawData) return;
         
         try {
-            await this.writeCharacteristic.writeValueWithoutResponse(this.buildPacket(commitHex));
-            alert("Sound committed to hardware screen!");
-        } catch(e) { this.log(`Commit failed: ${e.message}`, "error"); }
+            await this.savePresetToSlot(this.activePresetId, this.currentRawData);
+            alert("Preset saved to device memory!");
+        } catch(e) {
+            alert(`Failed to save preset: ${e.message}`);
+        }
     }
 
     // =========================================================
     // WRITE PARAMETERS
     // =========================================================
 
-    registerEdit() {
-        this.lastUiEditTime = Date.now();
-        if (!this.isModified) {
-            this.isModified = true;
-            const nameEl = document.getElementById('patchName');
-            if (nameEl && !nameEl.textContent.endsWith('*')) {
+    setModified(isMod) {
+        this.isModified = isMod;
+        const saveBtn = document.getElementById('savePresetBtn');
+        const nameEl = document.getElementById('patchName');
+        
+        if (saveBtn) {
+            saveBtn.disabled = !this.isConnected || !isMod;
+        }
+        
+        if (nameEl) {
+            if (isMod && !nameEl.textContent.endsWith('*')) {
                 nameEl.textContent += '*';
+            } else if (!isMod && nameEl.textContent.endsWith('*')) {
+                nameEl.textContent = nameEl.textContent.slice(0, -1);
             }
         }
     }
 
-    async toggleModule(blockId, isEnabled) {
-        if (!this.isConnected) return;
+    registerEdit() {
         this.lastUiEditTime = Date.now();
-        const cmdHex = `00 59 22 09 00 00 04 ${blockId.toString(16).padStart(2, '0')} 00 00 10 01 00 00 ${isEnabled ? "01" : "00"} 00`;
+        if (!this.isModified) {
+            this.setModified(true);
+        }
+    }
+
+    async toggleModule(toggleAddr, isEnabled) {
+        if (!this.isConnected) return;
+        this.registerEdit();
+        if (this.currentRawData) this.currentRawData[toggleAddr] = isEnabled ? 1 : 0;
+        const cmdHex = `00 59 22 09 00 00 04 ${toggleAddr.toString(16).padStart(2, '0')} 00 00 10 01 00 00 ${isEnabled ? "01" : "00"} 00`;
         await this.writeCharacteristic.writeValueWithoutResponse(this.buildPacket(cmdHex));
     }
 
     async changeKnob(addressDecimal, value) {
         if (!this.isConnected) return;
-        this.lastUiEditTime = Date.now();
-        let v = Math.max(0, Math.min(100, value)).toString(16).padStart(2, '0');
+        this.registerEdit();
+        let val = Math.max(0, Math.min(100, value));
+        if (this.currentRawData) this.currentRawData[addressDecimal] = val;
+        let v = val.toString(16).padStart(2, '0');
         const cmdHex = `00 59 22 0A 00 00 04 ${addressDecimal.toString(16).padStart(2, '0')} 00 00 10 02 00 00 ${v} 00 00`;
         await this.writeCharacteristic.writeValueWithoutResponse(this.buildPacket(cmdHex));
     }
 
     async changeModel(addressHex, modelId) {
         if (!this.isConnected) return;
-        this.lastUiEditTime = Date.now();
+        this.registerEdit();
+        if (this.currentRawData) this.currentRawData[addressHex] = modelId;
         const cmdHex = `00 59 22 09 00 00 04 ${addressHex.toString(16).padStart(2, '0')} 00 00 10 01 00 00 ${modelId.toString(16).padStart(2, '0')} 00`;
         await this.writeCharacteristic.writeValueWithoutResponse(this.buildPacket(cmdHex));
     }
 
     async changeRouting(newOrderArray) {
         if (!this.isConnected || newOrderArray.length !== 6) return;
-        this.lastUiEditTime = Date.now();
+        this.registerEdit();
+        if (this.currentRawData) {
+            for (let i = 0; i < 6; i++) {
+                this.currentRawData[2 + i] = newOrderArray[i];
+            }
+        }
         // newOrderArray must be an array of IDs from 0 to 5. Ex: [4, 0, 1, 2, 3, 5]
         const orderHex = newOrderArray.map(n => n.toString(16).padStart(2, '0')).join(' ');
         // Routing checksum is always D4, as the sum of (0+1+2+3+4+5) is constant
@@ -679,15 +753,18 @@ class MvaveBLEEditor {
         const disconnectBtn = document.getElementById('disconnectBtn');
         const statusText = document.getElementById('statusText');
         const statusDot = document.getElementById('statusDot');
+        const saveBtn = document.getElementById('savePresetBtn');
 
         if (this.isConnected) {
             btn.textContent = "Connected"; btn.disabled = true; btn.style.background = "#2a2a2a";
             if (disconnectBtn) disconnectBtn.disabled = false;
+            if (saveBtn) saveBtn.disabled = !this.isModified;
             statusText.textContent = "Synced"; statusText.style.color = "#44ff44";
             statusDot.classList.add('connected');
         } else {
             btn.textContent = "Connect Device"; btn.disabled = false; btn.style.background = "";
             if (disconnectBtn) disconnectBtn.disabled = true;
+            if (saveBtn) saveBtn.disabled = true;
             statusText.textContent = "Disconnected"; statusText.style.color = "#888";
             statusDot.classList.remove('connected');
         }
