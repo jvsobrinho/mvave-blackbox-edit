@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Blackbox Edit</title>
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+    <!-- SVG Icon Sprites -->
+    <svg style="display: none;" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+            <pattern id="meshPattern" patternUnits="userSpaceOnUse" width="8" height="8">
+                <path d="M0 0L8 8ZM8 0L0 8Z" stroke="currentColor" stroke-width="0.75"/>
+            </pattern>
+            <symbol id="icon-fx" viewBox="0 0 80 130">
+                <path d="M2 10C2 5.58172 5.58172 2 10 2H70C74.4183 2 78 5.58172 78 10V120C78 124.418 74.4183 128 70 128H10C5.58172 128 2 124.418 2 120V10Z" stroke="currentColor" stroke-width="3"/>
+                <line x1="2" y1="48" x2="78" y2="48" stroke="currentColor" stroke-width="2"/>
+                <circle cx="14" cy="24" r="6" stroke="currentColor" stroke-width="2.5"/>
+                <circle cx="31" cy="24" r="6" stroke="currentColor" stroke-width="2.5"/>
+                <circle cx="49" cy="24" r="6" stroke="currentColor" stroke-width="2.5"/>
+                <circle cx="66" cy="24" r="6" stroke="currentColor" stroke-width="2.5"/>
+                <circle cx="40" cy="100" r="8" fill="currentColor" stroke-width="2"/>
+                <circle cx="40" cy="100" r="9" stroke="currentColor"/>
+                <circle cx="40" cy="100" r="12" stroke="currentColor" stroke-width="2"/>
+                <rect x="8" y="68" width="64" height="55" rx="4" stroke="currentColor" stroke-width="2"/>
+                <circle cx="40" cy="9" r="4" stroke="currentColor" stroke-width="2"/>
+            </symbol>
+            <symbol id="icon-amp" viewBox="0 0 92 80">
+                <rect x="2" y="10" width="88" height="60" rx="8" stroke="currentColor" stroke-width="3"/>
+                <rect x="10" y="48" width="72" height="18" rx="4" stroke="currentColor" stroke-width="3"/>
+                <circle cx="23" cy="57" r="4" stroke="currentColor" stroke-width="2.5"/>
+                <circle cx="39" cy="57" r="4" stroke="currentColor" stroke-width="2.5"/>
+                <circle cx="54" cy="57" r="4" stroke="currentColor" stroke-width="2.5"/>
+                <circle cx="69" cy="57" r="4" stroke="currentColor" stroke-width="2.5"/>
+                <path d="M30 10 V4 H62 V10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+                <rect x="13" y="70" width="10" height="4" rx="2" fill="currentColor"/>
+                <rect x="69" y="70" width="10" height="4" rx="2" fill="currentColor"/>
+            </symbol>
+            <symbol id="icon-mod" viewBox="0 0 80 130">
+                <rect x="2" y="2" width="76" height="126" rx="10" stroke="currentColor" stroke-width="3"/>
+                <rect x="8" y="8" width="64" height="40" rx="4" stroke="currentColor" stroke-width="2"/>
+                <circle cx="22" cy="28" r="7" stroke="currentColor" stroke-width="2.5"/>
+                <circle cx="40" cy="28" r="7" stroke="currentColor" stroke-width="2.5"/>
+                <circle cx="58" cy="28" r="7" stroke="currentColor" stroke-width="2.5"/>
+                <rect x="20" y="65" width="40" height="40" rx="6" stroke="currentColor" stroke-width="3"/>
+                <circle cx="40" cy="54" r="3" fill="currentColor"/>
+            </symbol>
+            <symbol id="icon-dly" viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="15" stroke="currentColor" stroke-width="3"/>
+                <circle cx="50" cy="50" r="25" stroke="currentColor" stroke-width="2.5" stroke-opacity="0.7"/>
+                <circle cx="50" cy="50" r="35" stroke="currentColor" stroke-width="2" stroke-opacity="0.4"/>
+                <circle cx="50" cy="50" r="45" stroke="currentColor" stroke-width="1.5" stroke-opacity="0.2"/>
+            </symbol>
+            <symbol id="icon-rev" viewBox="0 0 100 100">
+                <rect x="15" y="35" width="50" height="50" stroke="currentColor" stroke-width="3"/>
+                <rect x="35" y="15" width="50" height="50" stroke="currentColor" stroke-width="3"/>
+                <line x1="15" y1="35" x2="35" y2="15" stroke="currentColor" stroke-width="3"/>
+                <line x1="65" y1="35" x2="85" y2="15" stroke="currentColor" stroke-width="3"/>
+                <line x1="15" y1="85" x2="35" y2="65" stroke="currentColor" stroke-width="3"/>
+                <line x1="65" y1="85" x2="85" y2="65" stroke="currentColor" stroke-width="3"/>
+                <path d="M43 51 L49 45 L49 56 Z" fill="currentColor"/>
+                <path d="M54 43 C 56 45, 56 55, 54 57" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                <path d="M56 41 C 59 45, 59 55, 56 59" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </symbol>
+            <symbol id="icon-cab" viewBox="0 0 120 130">
+                <rect x="2" y="10" width="116" height="110" rx="8" stroke="currentColor" stroke-width="3"/>
+                <rect x="10" y="18" width="100" height="94" rx="4" fill="url(#meshPattern)"/>
+                <rect x="10" y="18" width="100" height="94" rx="4" stroke="currentColor" stroke-width="3"/>
+                <path d="M40 10 V4 H80 V10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+                <rect x="15" y="120" width="10" height="4" rx="2" fill="currentColor"/>
+                <rect x="95" y="120" width="10" height="4" rx="2" fill="currentColor"/>
+            </symbol>
+        </defs>
+    </svg>
+
+    <div id="loadingOverlay" class="overlay">
+        <div class="spinner"></div>
+        <h2 id="loadingText" style="margin: 0">Reading Amps...</h2>
+        <p style="color: #888; margin-top: 5px">Syncing with Blackbox</p>
+    </div>
+
+    <div class="main-container">
+        <div class="sidebar">
+            <div class="sidebar-header">BLACKBOX EDIT</div>
+            <div class="connection-panel">
+                <div class="connection-status">
+                    <div id="statusDot" class="status-dot"></div>
+                    <span id="statusText" style="color: #888">Disconnected</span>
+                </div>
+                <button id="connectBtn" class="btn btn-primary" onclick="editor.connect()">
+                    Connect Device
+                </button>
+                <button id="disconnectBtn" class="btn" disabled onclick="editor.disconnect()">
+                    Disconnect
+                </button>
+            </div>
+
+            <div class="patch-list">
+                <div class="patch-search-container">
+                    <input type="text" id="patchSearchInput" placeholder="Search 80 presets...">
+                </div>
+                <div id="patchListContainer" class="patch-items-container">
+                    <!-- Items injected automatically by app.js -->
+                </div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div id="editor-container" style="display: flex; height: 100%; flex-direction: column; flex: 1">
+                
+                <div class="top-bar">
+                    <div class="patch-info">
+                        <div class="patch-number" id="patchNumber">M-VAVE</div>
+                        <div class="patch-name" id="patchName">Live Editor</div>
+                    </div>
+                    
+                    <div class="preset-controls">
+                        <button id="savePresetBtn" class="btn btn-save" disabled>SAVE</button>
+                    </div>
+                </div>
+
+                <div class="patch-volume-container">
+                    <div class="patch-volume-module">
+                        <div class="module-name">🔊 Patch Vol</div>
+                        <div class="slider-container">
+                            <input type="range" min="0" max="100" value="50" class="slider" id="patchVolSlider"
+                                   oninput="editor.registerEdit(); this.nextElementSibling.innerText = this.value; this.style.setProperty('--progress', this.value + '%');"
+                                   onchange="this.blur(); editor.changeKnob(0, parseInt(this.value))"
+                                   style="--progress: 50%">
+                            <span class="slider-value">50</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="signal-chain">
+                    <div class="chain-flow" id="signalChain"></div>
+                </div>
+
+                <div class="effects-panel">
+                    <div class="effect-controls active" id="workspacePanel">
+                        <div class="effect-description" style="color: #555; margin-top: 50px; text-align: center;">
+                            Connect the device and click on a pedal block to edit its parameters.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="log-toggle" id="logToggle">Show Log</div>
+    <div class="log-panel" id="logPanel">
+        <div class="log-header">
+            <h4>Communication Log</h4>
+            <button class="btn clear-btn" id="clearLogBtn">Clear</button>
+        </div>
+        <div class="manual-command-panel">
+            <input type="text" id="manualCommandInput" placeholder="Enter hex command..." />
+            <button id="sendManualCommandBtn" class="btn send-btn">Send</button>
+        </div>
+        <div class="log-content" id="logContent"></div>
+    </div>
+
+    <script src="descriptions.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
