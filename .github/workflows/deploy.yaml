@@ -1,0 +1,40 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    tags:
+      - 'v*' # Deployment will only trigger when pushing a tag starting with "v" (e.g., v0.1.0)
+
+# Necessary permissions for GitHub Actions to interact with Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Ensures that concurrent deployments do not conflict
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps: 'deployment'.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # Specifies that the root files (index.html, style.css, app.js) will be uploaded
+          path: '.'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
