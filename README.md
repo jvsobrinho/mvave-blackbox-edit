@@ -4,6 +4,7 @@ An unofficial, browser-based preset editor for the **M-Vave Blackbox** multi-eff
 
 ## Features
 
+* **Save to Device:** Save your modified configurations directly into the pedal's Flash memory slots via DMA.
 * **Live Editing:** Tweak parameters, change amp models, and toggle effects in real-time.
 * **Drag & Drop Routing:** Easily reorder your signal chain by dragging effect blocks.
 * **Smart Tap Tempo (Experimental):** Auto-calculates BPM to milliseconds (ms) for the Delay module. This feature was adapted from the original project to strictly match the physical boundaries described in the official Blackbox manual, but it still lacks hardware validation.
@@ -13,7 +14,6 @@ An unofficial, browser-based preset editor for the **M-Vave Blackbox** multi-eff
 
 The following features are planned but **not yet implemented**:
 
-* **Save Preset to Memory:** Saving configurations directly into the pedal's Flash memory slots (DMA).
 * **Import / Export Presets:** Backing up and sharing preset configurations as `.json` files.
 
 ## How it Works (Reverse Engineering)
