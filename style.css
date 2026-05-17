@@ -258,14 +258,6 @@ body {
     z-index: 100;
 }
 
-.chain-module.placeholder {
-    background: rgba(255, 107, 53, 0.05); /* Very subtle background */
-    border: 2px dashed #ff6b35; /* Dashed orange preview border */
-    box-shadow: none;
-    opacity: 0.8;
-    transform: none; /* Remove scale effect to fit alignment */
-}
-
 .module-icon {
     width: 45px;
     height: 45px;

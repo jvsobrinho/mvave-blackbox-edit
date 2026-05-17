@@ -60,6 +60,15 @@ class MvaveBLEEditor {
     // UI Init Methods
     // =========================================================
 
+    formatDisplayValue(blockId, paramName, value) {
+        let val = parseInt(value, 10);
+        if (blockId === 'cab') {
+            if (paramName === 'Low Cut') return Math.round(20 + (val / 100) * 280) + 'Hz';
+            if (paramName === 'High Cut') return (5.0 + (val / 100) * 13.0).toFixed(1) + 'kHz';
+        }
+        return val;
+    }
+
     initLogPanel() {
         this.logPanel = document.getElementById('logPanel');
         this.logToggle = document.getElementById('logToggle');
@@ -138,15 +147,25 @@ class MvaveBLEEditor {
             const slider = targetSpan.previousElementSibling;
             if (!slider || !slider.classList.contains('slider')) return;
 
-            const currentVal = targetSpan.textContent;
+            const blockId = slider.dataset.blockId;
+            const paramName = slider.dataset.paramName;
+            const currentSliderVal = parseInt(slider.value, 10);
+            const currentRawVal = (blockId === 'cab' && paramName === 'High Cut') ? (100 - currentSliderVal) : currentSliderVal;
+            
             const input = document.createElement('input');
             input.type = 'number';
             input.className = 'slider-value-input';
-            input.value = currentVal;
-            input.min = slider.min;
-            input.max = slider.max;
             
-            input.style.width = '40px';
+            if (blockId === 'cab' && (paramName === 'Low Cut' || paramName === 'High Cut')) {
+                input.value = parseFloat(this.formatDisplayValue(blockId, paramName, currentRawVal));
+                input.step = paramName === 'High Cut' ? '0.1' : '1';
+            } else {
+                input.value = currentRawVal;
+                input.min = slider.min;
+                input.max = slider.max;
+            }
+            
+            input.style.width = '45px';
             input.style.background = '#1e1e1e';
             input.style.color = '#ff6b35';
             input.style.border = '1px solid #ff6b35';
@@ -156,24 +175,49 @@ class MvaveBLEEditor {
             input.select();
 
             const finalizeEdit = () => {
-                let newValue = parseInt(input.value, 10);
-                if (isNaN(newValue)) newValue = parseInt(currentVal, 10);
-                newValue = Math.max(slider.min, Math.min(newValue, slider.max));
+                let inputVal = parseFloat(input.value);
+                let newRawValue;
                 
-                slider.value = newValue;
-                // Dispatches the 'change' event to update the device
+                if (isNaN(inputVal)) {
+                    newRawValue = currentRawVal;
+                } else if (blockId === 'cab' && paramName === 'Low Cut') {
+                    newRawValue = Math.round(((inputVal - 20) / 280) * 100);
+                    newRawValue = Math.max(0, Math.min(newRawValue, 100));
+                } else if (blockId === 'cab' && paramName === 'High Cut') {
+                    newRawValue = Math.round(((inputVal - 5.0) / 13.0) * 100);
+                    newRawValue = Math.max(0, Math.min(newRawValue, 100));
+                } else {
+                    const sMin = parseFloat(slider.min) || 0;
+                    const sMax = parseFloat(slider.max) || 100;
+                    newRawValue = Math.max(sMin, Math.min(Math.round(inputVal), sMax));
+                }
+                
+                let newSliderVal = (blockId === 'cab' && paramName === 'High Cut') ? (100 - newRawValue) : newRawValue;
+                slider.value = newSliderVal;
+                slider.style.setProperty('--progress', newSliderVal + '%');
                 slider.dispatchEvent(new Event('change', { bubbles: true }));
                 
                 const newSpan = document.createElement('span');
                 newSpan.className = 'slider-value';
-                newSpan.textContent = newValue;
+                
+                if (blockId && paramName) {
+                    newSpan.textContent = this.formatDisplayValue(blockId, paramName, newRawValue);
+                } else {
+                    newSpan.textContent = newRawValue;
+                }
                 input.replaceWith(newSpan);
             };
 
             input.addEventListener('blur', finalizeEdit);
             input.addEventListener('keydown', e => {
                 if (e.key === 'Enter') finalizeEdit();
-                if (e.key === 'Escape') input.blur();
+                if (e.key === 'Escape') {
+                    input.removeEventListener('blur', finalizeEdit);
+                    const originalSpan = document.createElement('span');
+                    originalSpan.className = 'slider-value';
+                    originalSpan.textContent = targetSpan.textContent;
+                    input.replaceWith(originalSpan);
+                }
             });
         });
     }
@@ -349,12 +393,28 @@ class MvaveBLEEditor {
         } catch (error) { this.log(`Connection error: ${error.message}`, "error"); }
     }
 
+    async disconnect() {
+        if (this.device && this.device.gatt.connected) {
+            await this.device.gatt.disconnect();
+        }
+    }
+
     handleDisconnect() {
         this.isConnected = false;
         this.syncState = 'IDLE';
         this.updateUI();
         if (this.pollingInterval) clearInterval(this.pollingInterval);
         document.getElementById('loadingOverlay').style.display = 'none';
+        
+        // Reset workspace to locked state
+        const workspace = document.getElementById('workspacePanel');
+        if (workspace) {
+            workspace.innerHTML = `<div class="effect-description" style="color: #555; margin-top: 50px; text-align: center;">Connect the device and click on a pedal block to edit its parameters.</div>`;
+            delete workspace.dataset.activeBlock;
+            delete workspace.dataset.activeModel;
+        }
+        
+        this.renderSignalChain(false, true); // Force rebuild to show "Please sync"
         this.log("Disconnected from BlackBox.", "error");
     }
 
@@ -616,33 +676,66 @@ class MvaveBLEEditor {
 
     updateUI() {
         const btn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
         const statusText = document.getElementById('statusText');
         const statusDot = document.getElementById('statusDot');
 
         if (this.isConnected) {
             btn.textContent = "Connected"; btn.disabled = true; btn.style.background = "#2a2a2a";
+            if (disconnectBtn) disconnectBtn.disabled = false;
             statusText.textContent = "Synced"; statusText.style.color = "#44ff44";
             statusDot.classList.add('connected');
         } else {
             btn.textContent = "Connect Device"; btn.disabled = false; btn.style.background = "";
+            if (disconnectBtn) disconnectBtn.disabled = true;
             statusText.textContent = "Disconnected"; statusText.style.color = "#888";
             statusDot.classList.remove('connected');
         }
     }
 
-    renderSignalChain() {
+    renderSignalChain(fromPolling = false) {
         const container = document.getElementById('signalChain');
         if (!container || !this.currentState) return;
         
-        // Maximum protection: aborts recreation if user is dragging or hovering here
+        // Maximum protection: aborts recreation if user is dragging
         if (this.isDragging) return;
-        if (this.currentlyHoveredControl && container.contains(this.currentlyHoveredControl)) return;
+        
+        // Check if DOM already exists and routing order matches
+        const currentDOMBlocks = Array.from(container.querySelectorAll('.chain-module'));
+        const orderMatches = currentDOMBlocks.length === this.currentState.routing.length && 
+                             currentDOMBlocks.every((el, i) => parseInt(el.dataset.blockNumber) === this.currentState.routing[i]);
+
+        if (orderMatches && container.children.length > 0) {
+            // SMART UPDATE: Just update classes (preserves hover and drag states)
+            this.currentState.routing.forEach((blockNumber, index) => {
+                const blockInfo = this.BLOCKS[blockNumber];
+                const isOn = this.currentState.modulesOn[blockInfo.id];
+                const blockEl = currentDOMBlocks[index];
+                
+                blockEl.classList.toggle('active', isOn);
+                const statusDot = blockEl.querySelector('.module-status');
+                if (statusDot) statusDot.classList.toggle('on', isOn);
+                
+                const typeEl = blockEl.querySelector('.module-type');
+                if (typeEl) {
+                    const currentModelId = this.currentState.models[blockInfo.id];
+                    typeEl.textContent = this.isConnected ? blockInfo.modelNames[currentModelId] : 'Please sync';
+                }
+            });
+            return;
+        }
+
+        // FULL REBUILD: Aborts if user is hovering during a background poll that requires order change
+        if (fromPolling && this.currentlyHoveredControl && container.contains(this.currentlyHoveredControl)) return;
 
         container.innerHTML = '';
 
         this.currentState.routing.forEach((blockNumber, index) => {
             const blockInfo = this.BLOCKS[blockNumber];
             const isOn = this.currentState.modulesOn[blockInfo.id];
+            const currentModelId = this.currentState.models[blockInfo.id];
+            const modelName = this.isConnected ? blockInfo.modelNames[currentModelId] : 'Please sync';
+            
             const blockEl = document.createElement('div');
             blockEl.className = `chain-module ${isOn ? 'active' : ''}`;
             blockEl.draggable = true;
@@ -652,13 +745,24 @@ class MvaveBLEEditor {
                 <svg class="module-icon"><use href="#icon-${blockInfo.id}"></use></svg>
                 <div class="module-status ${isOn ? 'on' : ''}"></div>
                 <div class="module-name">${blockInfo.label}</div>
+                <div class="module-type">${modelName}</div>
             `;
 
             blockEl.onclick = async (e) => {
+                if (!this.isConnected) return;
+                
                 if (e.target.classList.contains('module-status')) {
-                    await this.toggleModule(blockInfo.toggleAddr, !isOn);
-                    this.currentState.modulesOn[blockInfo.id] = !isOn;
+                    // Use dynamic state to avoid closure staleness
+                    const currentIsOn = this.currentState.modulesOn[blockInfo.id];
+                    await this.toggleModule(blockInfo.toggleAddr, !currentIsOn);
+                    this.currentState.modulesOn[blockInfo.id] = !currentIsOn;
                     this.renderSignalChain(false);
+                    
+                    // Keep the workspace panel in sync if it's currently showing this module
+                    if (this.selectedBlockId === blockNumber) {
+                        const wsToggle = document.getElementById('blockToggle');
+                        if (wsToggle) wsToggle.classList.toggle('on', !currentIsOn);
+                    }
                 } else { 
                     this.renderWorkspace(blockNumber, false); 
                 }
@@ -697,9 +801,11 @@ class MvaveBLEEditor {
                     
                     // Only updates slider if not currently focused/edited by the user
                     if (slider && document.activeElement !== slider && this.currentlyHoveredControl !== slider) {
-                        slider.value = val;
-                        slider.nextElementSibling.innerText = val;
-                        slider.style.setProperty('--progress', val + '%');
+                        const isHighCut = (block.id === 'cab' && pName === 'High Cut');
+                        const uiVal = isHighCut ? (100 - val) : val;
+                        slider.value = uiVal;
+                        slider.nextElementSibling.innerText = this.formatDisplayValue(block.id, pName, val);
+                        slider.style.setProperty('--progress', uiVal + '%');
                     }
                 });
                 if (block.id === 'dly') {
@@ -723,7 +829,18 @@ class MvaveBLEEditor {
         let optionsHtml = '';
         block.modelNames.forEach((name, i) => { optionsHtml += `<option value="${i}" ${i === currentModelId ? 'selected' : ''}>${name}</option>`; });
 
+        const currentModelName = block.modelNames[currentModelId];
+        const normalize = (str) => (str || '').replace(/[\s_]+/g, '').toLowerCase();
+        const normalizedTarget = normalize(currentModelName);
+        
+        let description = `Custom or undocumented ${block.label} model.`;
+        if (window.EFFECT_DESCRIPTIONS) {
+            const matchedKey = Object.keys(window.EFFECT_DESCRIPTIONS).find(key => normalize(key) === normalizedTarget);
+            if (matchedKey) description = window.EFFECT_DESCRIPTIONS[matchedKey];
+        }
+
         let html = `
+            <div class="effect-description">${description}</div>
             <div class="control-section">
                 <h4>${block.label}</h4>
                 <div class="control-row">
@@ -742,15 +859,22 @@ class MvaveBLEEditor {
             if (pName === 'Ghost') return;
             const addr = block.knobStart + (i * 2);
             const val = this.currentState.knobs[block.id][addr];
+            const isHighCut = (block.id === 'cab' && pName === 'High Cut');
+            const uiVal = isHighCut ? (100 - val) : val;
+            const displayVal = this.formatDisplayValue(block.id, pName, val);
+            
+            let oninputCode = `editor.registerEdit(); let rawVal = ${isHighCut ? '100 - parseInt(this.value)' : 'parseInt(this.value)'}; this.nextElementSibling.innerText = editor.formatDisplayValue('${block.id}', '${pName}', rawVal); this.style.setProperty('--progress', this.value + '%');`;
+            let onchangeCode = `this.blur(); let rawVal = ${isHighCut ? '100 - parseInt(this.value)' : 'parseInt(this.value)'}; editor.changeKnob(${addr}, rawVal)`;
+
             html += `
                 <div class="control-row">
                     <div class="control-label">${pName}</div>
                     <div class="slider-container">
-                        <input type="range" min="0" max="100" value="${val}" class="slider" data-addr="${addr}"
-                               oninput="editor.registerEdit(); this.nextElementSibling.innerText = this.value; this.style.setProperty('--progress', this.value + '%');"
-                               onchange="this.blur(); editor.changeKnob(${addr}, parseInt(this.value))"
-                               style="--progress: ${val}%">
-                        <span class="slider-value">${val}</span>
+                        <input type="range" min="0" max="100" value="${uiVal}" class="slider" data-addr="${addr}" data-block-id="${block.id}" data-param-name="${pName}"
+                               oninput="${oninputCode}"
+                               onchange="${onchangeCode}"
+                               style="--progress: ${uiVal}%">
+                        <span class="slider-value">${displayVal}</span>
                     </div>
                 </div>`;
         });
@@ -958,8 +1082,6 @@ class MvaveBLEEditor {
         if (!container) return;
 
         let draggedElement = null;
-        const placeholder = document.createElement('div');
-        placeholder.className = 'chain-module placeholder';
 
         container.addEventListener('dragstart', e => {
             this.registerEdit(); // Locks polling while holding the module
@@ -980,9 +1102,6 @@ class MvaveBLEEditor {
                     document.body.removeChild(dragIcon);
                     if (draggedElement) {
                         draggedElement.classList.add('dragging');
-                        draggedElement.style.display = 'none'; // Now safe to use display: none
-                        // Inserts placeholder to prevent layout collapse
-                        container.insertBefore(placeholder, draggedElement.nextSibling);
                     }
                 }, 0);
             }
@@ -993,10 +1112,21 @@ class MvaveBLEEditor {
             this.registerEdit(); // Keeps polling locked while dragging
             if (draggedElement) {
                 const afterElement = this.getDragAfterElement(container, e.clientX);
+
                 if (afterElement == null) {
-                    container.appendChild(placeholder);
+                    container.appendChild(draggedElement);
                 } else {
-                    container.insertBefore(placeholder, afterElement);
+                    container.insertBefore(draggedElement, afterElement);
+                }
+                
+                // Instantly reorganize the 5 connectors to sit between the pedals
+                const modules = container.querySelectorAll('.chain-module');
+                const connectors = container.querySelectorAll('.chain-connector');
+                
+                for (let i = 0; i < connectors.length; i++) {
+                    if (modules[i] && modules[i].nextSibling !== connectors[i]) {
+                        container.insertBefore(connectors[i], modules[i].nextSibling);
+                    }
                 }
             }
         });
@@ -1004,22 +1134,11 @@ class MvaveBLEEditor {
         container.addEventListener('dragend', e => {
             this.isDragging = false;
             if (draggedElement) {
-                // Safely checks if placeholder still exists
-                if (placeholder.parentNode === container) {
-                    container.insertBefore(draggedElement, placeholder);
-                } else {
-                    // Fallback in case DOM was forcibly overwritten
-                    container.appendChild(draggedElement); 
-                }
-                draggedElement.style.display = '';
                 draggedElement.classList.remove('dragging');
-                if (placeholder.parentNode) {
-                    placeholder.parentNode.removeChild(placeholder);
-                }
                 draggedElement = null;
 
                 const newOrder = [];
-                container.querySelectorAll('.chain-module:not(.placeholder)').forEach(el => {
+                container.querySelectorAll('.chain-module').forEach(el => {
                     newOrder.push(parseInt(el.dataset.blockNumber, 10));
                 });
 
@@ -1030,13 +1149,13 @@ class MvaveBLEEditor {
                         this.changeRouting(newOrder); // Dispatches without blocking UI rendering
                     }
                 }
-                this.renderSignalChain(false);
+                this.renderSignalChain(false, true);
             }
         });
     }
 
     getDragAfterElement(container, x) {
-        const draggableElements = [...container.querySelectorAll('.chain-module:not(.dragging):not(.placeholder)')];
+        const draggableElements = [...container.querySelectorAll('.chain-module:not(.dragging)')];
 
         return draggableElements.reduce((closest, child) => {
             const box = child.getBoundingClientRect();

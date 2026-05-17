@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Blackbox Pocket Edit</title>
+    <title>Blackbox Edit</title>
     <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -91,6 +91,9 @@
                 <button id="connectBtn" class="btn btn-primary" onclick="editor.connect()">
                     Connect Device
                 </button>
+                <button id="disconnectBtn" class="btn" disabled onclick="editor.disconnect()">
+                    Disconnect
+                </button>
             </div>
 
             <div class="patch-list">
@@ -158,6 +161,7 @@
         <div class="log-content" id="logContent"></div>
     </div>
 
+    <script src="descriptions.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
