@@ -712,7 +712,7 @@ class MvaveBLEEditor {
                 const isOn = this.currentState.modulesOn[blockInfo.id];
                 const blockEl = currentDOMBlocks[index];
                 
-                blockEl.classList.toggle('active', isOn);
+                blockEl.classList.toggle('active', blockNumber === this.selectedBlockId);
                 const statusDot = blockEl.querySelector('.module-status');
                 if (statusDot) statusDot.classList.toggle('on', isOn);
                 
@@ -737,7 +737,7 @@ class MvaveBLEEditor {
             const modelName = this.isConnected ? blockInfo.modelNames[currentModelId] : 'Please sync';
             
             const blockEl = document.createElement('div');
-            blockEl.className = `chain-module ${isOn ? 'active' : ''}`;
+            blockEl.className = `chain-module ${this.selectedBlockId === blockNumber ? 'active' : ''}`;
             blockEl.draggable = true;
             blockEl.dataset.blockNumber = blockNumber;
 
@@ -821,6 +821,12 @@ class MvaveBLEEditor {
         }
 
         this.selectedBlockId = blockNumber;
+
+        // Updates the orange border to reflect the selection in the panel
+        document.querySelectorAll('.chain-module').forEach(el => {
+            const id = parseInt(el.dataset.blockNumber, 10);
+            el.classList.toggle('active', id === blockNumber);
+        });
 
         // Tags the current panel so Smart Update knows future context
         workspace.dataset.activeBlock = blockNumber;
