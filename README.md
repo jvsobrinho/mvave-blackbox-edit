@@ -21,7 +21,7 @@ The following features are planned but **not yet implemented**:
 Since the M-Vave Blackbox does not use standard Universal MIDI over BLE, this editor relies on a fully reverse-engineered GATT protocol.
 
 If you are interested in the technical details, memory maps, and the proprietary hexadecimal packet structure used by the pedal, check out the dedicated documentation repository:
-**M-Vave Blackbox BLE Protocol**
+**[M-Vave Blackbox BLE Protocol](https://github.com/jvsobrinho/mvave-blackbox-ble)**
 
 ## Acknowledgments & Credits
 
