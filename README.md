@@ -2,26 +2,40 @@
 
 An unofficial, browser-based preset editor for the **M-Vave Blackbox** multi-effects pedal, utilizing Web Bluetooth (BLE) for real-time bidirectional communication.
 
+### [Launch BlackboxEdit Web App](https://jvsobrinho.github.io/mvave-blackbox-edit/)
+*(No installation required. Best experienced on Google Chrome or Microsoft Edge supporting Web Bluetooth)*
+
+---
+
+> **EXPERIMENTAL PHASE: USE AT YOUR OWN RISK**
+> This application is still under active testing (Beta). The use of direct flash memory write commands (Save) and the provided scripts interacts intimately with the pedal's core hardware. **The author is not responsible for any bricked devices, hardware damage, or data loss.** Use this software and the reverse-engineered protocols entirely at your own risk.
+
+---
+
 ## Features
 
-* **Save to Device:** Save your modified configurations directly into the pedal's Flash memory slots via DMA.
+* **Save to Device:** Save your modified configurations directly into the pedal's hardware Flash memory slots via DMA.
 * **Live Editing:** Tweak parameters, change amp models, and toggle effects in real-time.
-* **Drag & Drop Routing:** Easily reorder your signal chain by dragging effect blocks.
-* **Smart Tap Tempo (Experimental):** Auto-calculates BPM to milliseconds (ms) for the Delay module. This feature was adapted from the original project to strictly match the physical boundaries described in the official Blackbox manual, but it still lacks hardware validation.
-* **Seamless Sync:** Polling-based background synchronization keeps the editor updated when physical footswitches are pressed.
+* **Drag & Drop Routing:** Easily reorder your signal chain by dragging and dropping effect blocks in the workspace.
+* **Smart Tap Tempo (Experimental):** Auto-calculates BPM to milliseconds (ms) for the Delay module. Adapted from the original project to strictly match the physical boundaries described in the official Blackbox manual (hardware validation pending).
+* **Seamless Sync:** Polling-based background synchronization keeps the editor instantly updated when physical footswitches are pressed.
 
-## Work in Progress / To-Do
+## Work in Progress 
 
-The following features are planned but **not yet implemented**:
-
+The following features are currently in development:
 * **Import / Export Presets:** Backing up and sharing preset configurations as `.json` files.
+* **Full Device Dump:** Creating complete backups of all 80 preset slots.
+
+---
 
 ## How it Works (Reverse Engineering)
 
 Since the M-Vave Blackbox does not use standard Universal MIDI over BLE, this editor relies on a fully reverse-engineered GATT protocol.
 
-If you are interested in the technical details, memory maps, and the proprietary hexadecimal packet structure used by the pedal, check out the dedicated documentation repository:
+If you are interested in the technical details, memory maps, offset calculations, and the proprietary hexadecimal packet structure used by the pedal, check out the dedicated documentation repository:
 **[M-Vave Blackbox BLE Protocol](https://github.com/jvsobrinho/mvave-blackbox-ble)**
+
+---
 
 ## Acknowledgments & Credits
 
@@ -34,11 +48,11 @@ Special thanks to the original authors for their open-source spirit and for expl
 
 You can view their original repository here: **[suckyble/PocketEdit](https://github.com/suckyble/PocketEdit)**
 
-## Disclaimer
+---
 
-**Note:** This project is an independent open-source initiative and is not endorsed by, affiliated with, or connected to M-Vave.
+## Legal Disclaimer
+
+This project is an independent open-source initiative and is not endorsed by, affiliated with, or connected to M-Vave.
 
 * **M-VAVE** and **CUVAVE** are registered trademarks of **Zhuhai Shengke Intelligent Technology Co., Ltd.**
 * Any brand names, trademarks, or model names mentioned in this project are the property of their respective owners and are used solely for descriptive and educational purposes.
-
-The use of direct flash memory write commands (Save) and the provided scripts is entirely at the user's own risk. The author is not responsible for any bricked devices, hardware damage, or data loss.
