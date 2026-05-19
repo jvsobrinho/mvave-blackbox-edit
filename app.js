@@ -33,6 +33,10 @@ class MvaveBLEEditor {
         this.activePresetId = 0;
         this.currentRawData = new Uint8Array(92);
 
+        this.pendingSaveResolve = null;
+        this.pendingSaveReject = null;
+        this.saveTimeoutId = null;
+
         // Pre-populate offline state so the signal chain (and arrows) are visible immediately
         this.currentState = {
             volume: 50,
@@ -498,8 +502,14 @@ class MvaveBLEEditor {
 
         // --- DEVICE ACKNOWLEDGMENT (ACK) ---
         if (bytes.length === 8 && bytes[3] === 0x01 && bytes[7] === 0xFF) {
-            // Optional: Uncomment below to debug fast arriving commands
-            // this.log("Action Acknowledged by Device", "success");
+            if (this.pendingSaveResolve) {
+                clearTimeout(this.saveTimeoutId);
+                this.pendingSaveResolve(true);
+                this.pendingSaveResolve = null;
+                this.pendingSaveReject = null;
+                this.saveTimeoutId = null;
+                this.log("Save Acknowledged by Device", "success");
+            }
             return;
         }
 
@@ -651,25 +661,58 @@ class MvaveBLEEditor {
 
         this.log(`Saving preset to P${(presetId + 1).toString().padStart(2, '0')}...`, "sent");
 
-        try {
-            await this.writeCharacteristic.writeValueWithoutResponse(payload);
-            this.log(`Preset saved successfully to P${(presetId + 1).toString().padStart(2, '0')}!`, "success");
+        return new Promise(async (resolve, reject) => {
+            this.pendingSaveResolve = resolve;
+            this.pendingSaveReject = reject;
             
-            this.setModified(false);
-        } catch (error) {
-            this.log(`Save preset failed: ${error.message}`, "error");
-            throw error;
-        }
+            this.saveTimeoutId = setTimeout(() => {
+                this.pendingSaveResolve = null;
+                this.pendingSaveReject = null;
+                reject(new Error("Timeout: Device did not acknowledge the save operation."));
+            }, 3000);
+
+            try {
+                await this.writeCharacteristic.writeValueWithoutResponse(payload);
+            } catch (error) {
+                clearTimeout(this.saveTimeoutId);
+                this.pendingSaveResolve = null;
+                this.pendingSaveReject = null;
+                reject(error);
+            }
+        });
     }
 
     async saveCurrentPreset() {
         if (!this.isConnected || this.activePresetId === undefined || !this.currentRawData) return;
         
+        const saveBtn = document.getElementById('savePresetBtn');
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.textContent = "SAVING...";
+        }
+
         try {
             await this.savePresetToSlot(this.activePresetId, this.currentRawData);
-            alert("Preset saved to device memory!");
+            this.setModified(false);
+            this.log(`Preset saved successfully to P${(this.activePresetId + 1).toString().padStart(2, '0')}!`, "success");
+            
+            if (saveBtn) {
+                saveBtn.textContent = "SAVED!";
+                saveBtn.style.background = "#44ff44";
+                saveBtn.style.color = "#000";
+                setTimeout(() => {
+                    saveBtn.textContent = "SAVE";
+                    saveBtn.style.background = "";
+                    saveBtn.style.color = "";
+                }, 2000);
+            }
         } catch(e) {
+            this.log(`Save preset failed: ${e.message}`, "error");
             alert(`Failed to save preset: ${e.message}`);
+            if (saveBtn) {
+                saveBtn.disabled = !this.isModified;
+                saveBtn.textContent = "SAVE";
+            }
         }
     }
 
