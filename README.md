@@ -64,3 +64,11 @@ This project is an independent open-source initiative and is not endorsed by, af
 This project is licensed under the MIT License.
 
 Please note that the reverse-engineering research, protocol documentation, memory maps, and reference tools used by this project are maintained in the separate **M-Vave Blackbox BLE Protocol** repository, which is licensed independently under **CC BY-SA 4.0** (documentation) and **GPL-3.0** (source code).
+
+## Commercial Use & Attribution
+
+Commercial use of this project is permitted under the terms of the MIT License.
+
+If you build commercial hardware, software, or services based on this editor, please provide visible public attribution to both this project and the original **[M-Vave Blackbox BLE Protocol](https://github.com/jvsobrinho/mvave-blackbox-ble)** repository.
+
+The reverse-engineering research, protocol documentation, memory maps, and reference tools are maintained as a separate open-source project under different licenses. If your work incorporates that research, you are responsible for complying with the applicable license terms of that repository.
