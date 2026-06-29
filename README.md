@@ -56,3 +56,11 @@ This project is an independent open-source initiative and is not endorsed by, af
 
 * **M-VAVE** and **CUVAVE** are registered trademarks of **Zhuhai Shengke Intelligent Technology Co., Ltd.**
 * Any brand names, trademarks, or model names mentioned in this project are the property of their respective owners and are used solely for descriptive and educational purposes.
+
+---
+
+## License
+
+This project is licensed under the MIT License.
+
+Please note that the reverse-engineering research, protocol documentation, memory maps, and reference tools used by this project are maintained in the separate **M-Vave Blackbox BLE Protocol** repository, which is licensed independently under **CC BY-SA 4.0** (documentation) and **GPL-3.0** (source code).
